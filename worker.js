@@ -115,8 +115,11 @@ export default {
 
       // Build context with profile info
       let contextPrompt = SYSTEM_PROMPT;
+      if (profile.botName) {
+        contextPrompt += `\n\n## YOUR NAME\nYour name is "${profile.botName}". Always introduce yourself as ${profile.botName}.`;
+      }
       if (profile.name) {
-        contextPrompt += `\n\n## STUDENT INFO\n- Name: ${profile.name}`;
+        contextPrompt += `\n\n## FRIEND INFO\n- Name: ${profile.name}`;
         if (profile.age) contextPrompt += `\n- Age: ${profile.age}`;
         if (profile.level) contextPrompt += `\n- Level: ${profile.level}`;
         contextPrompt += `\n- Today: ${new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
