@@ -198,8 +198,12 @@ body {
 const WORKER_URL = 'https://chat-proxy.dunglumy.workers.dev';
 
 // ===== STATE =====
-let chatHistory = [];
+let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
 let sending = false;
+
+function saveChat() {
+  localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+}
 
 const $=id=>document.getElementById(id);
 
@@ -215,6 +219,7 @@ async function sendMsg() {
 
   // Add user message
   chatHistory.push({ role: 'user', content: text });
+  saveChat();
   addBubble('user', text);
   input.value = '';
   input.focus();
@@ -237,6 +242,7 @@ async function sendMsg() {
 
     const reply = data.reply;
     chatHistory.push({ role: 'assistant', content: reply });
+    saveChat();
     removeTyping(typingEl);
     addBubble('ai', reply);
 
@@ -293,6 +299,7 @@ function showError(msg) {
 // ===== XÓA CHAT =====
 function clearChat() {
   chatHistory = [];
+  saveChat();
   $('chatBox').innerHTML = `
     <div class="welcome" id="welcome">
       <div class="icon">&#128075;</div>
@@ -300,6 +307,15 @@ function clearChat() {
       <p>Hãy nhắn gì đó để bắt đầu học tiếng Anh nhé!<br>
       Bé có thể viết tiếng Việt hoặc tiếng Anh đều được &#128522;</p>
     </div>`;
+}
+
+// Khôi phục chat cũ từ localStorage
+if (chatHistory.length > 0) {
+  const wel = $('welcome');
+  if (wel) wel.remove();
+  chatHistory.forEach(msg => {
+    addBubble(msg.role === 'user' ? 'user' : 'ai', msg.content);
+  });
 }
 
 // Focus input on load
