@@ -24,7 +24,6 @@ body {
   flex-direction: column;
   position: relative;
 }
-/* Header */
 #header {
   background: linear-gradient(135deg, #667eea, #764ba2);
   color: white;
@@ -37,16 +36,18 @@ body {
   flex-shrink: 0;
 }
 #header .title { display: flex; align-items: center; gap: 8px; }
-#clearBtn {
+.hdr-btn {
   background: rgba(255,255,255,0.2);
   border: none;
   color: white;
   padding: 6px 12px;
   border-radius: 16px;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
+  margin-left: 6px;
 }
-#clearBtn:hover { background: rgba(255,255,255,0.35); }
+.hdr-btn:hover { background: rgba(255,255,255,0.35); }
+#headerBtns { display: flex; }
 
 /* Chat area */
 #chatBox {
@@ -58,7 +59,45 @@ body {
   gap: 12px;
 }
 
-/* Welcome message */
+/* Screens */
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  text-align: center;
+}
+.screen h2 { color: #333; margin-bottom: 16px; font-size: 22px; }
+.screen p { color: #666; margin-bottom: 20px; line-height: 1.6; font-size: 15px; }
+.screen input {
+  width: 100%;
+  max-width: 280px;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 18px;
+  text-align: center;
+  outline: none;
+  margin-bottom: 12px;
+}
+.screen input:focus { border-color: #667eea; }
+.screen .big-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 24px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.screen .big-btn:hover { opacity: 0.9; }
+.screen .icon { font-size: 60px; margin-bottom: 16px; }
+.screen .error-msg { color: #e74c3c; font-size: 14px; margin-top: 8px; }
+
+/* Welcome */
 .welcome {
   text-align: center;
   padding: 30px 20px;
@@ -72,7 +111,6 @@ body {
 .msg { display: flex; flex-direction: column; max-width: 82%; }
 .msg.ai { align-self: flex-start; }
 .msg.user { align-self: flex-end; }
-
 .bubble {
   padding: 10px 14px;
   border-radius: 16px;
@@ -100,7 +138,7 @@ body {
 }
 .msg.user .label { text-align: right; }
 
-/* Typing indicator */
+/* Typing */
 .typing { display: flex; gap: 4px; padding: 10px 14px; }
 .typing span {
   width: 8px; height: 8px;
@@ -151,7 +189,6 @@ body {
 #sendBtn:hover { opacity: 0.9; }
 #sendBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Error */
 .error {
   text-align: center;
   color: #e74c3c;
@@ -159,11 +196,9 @@ body {
   padding: 8px;
 }
 
-/* Scrollbar */
 #chatBox::-webkit-scrollbar { width: 6px; }
 #chatBox::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
 
-/* Mobile */
 @media (max-width: 480px) {
   #app { max-width: 100%; border-radius: 0; }
 }
@@ -173,58 +208,163 @@ body {
 
 <div id="app">
   <div id="header">
-    <div class="title">&#127775; Chat Tiếng Anh</div>
-    <button id="clearBtn" onclick="clearChat()">Xóa chat</button>
-  </div>
-
-  <div id="chatBox">
-    <div class="welcome" id="welcome">
-      <div class="icon">&#128075;</div>
-      <h2>Xin chào bé!</h2>
-      <p>Hãy nhắn gì đó để bắt đầu học tiếng Anh nhé!<br>
-      Bé có thể viết tiếng Việt hoặc tiếng Anh đều được &#128522;</p>
+    <div class="title">&#127775; Học Tiếng Anh</div>
+    <div id="headerBtns">
+      <button class="hdr-btn" onclick="clearChat()">Xóa chat</button>
+      <button class="hdr-btn" onclick="resetAll()">Đổi tài khoản</button>
     </div>
   </div>
 
-  <div id="inputBar">
+  <!-- Màn hình nhập mật mã -->
+  <div class="screen" id="keyScreen">
+    <div class="icon">&#128274;</div>
+    <h2>Nhập mật mã</h2>
+    <p>Hỏi ba mẹ mật mã để vào học nhé!</p>
+    <input type="password" id="keyInput" placeholder="Mật mã..." onkeydown="if(event.key==='Enter')submitKey()">
+    <br>
+    <button class="big-btn" onclick="submitKey()">Vào học</button>
+    <div class="error-msg" id="keyError"></div>
+  </div>
+
+  <!-- Màn hình nhập tên tuổi -->
+  <div class="screen hidden" id="profileScreen">
+    <div class="icon">&#128075;</div>
+    <h2>Chào bạn mới!</h2>
+    <p>Cô AI muốn biết về bạn nhé</p>
+    <input type="text" id="nameInput" placeholder="Tên của bạn..." onkeydown="if(event.key==='Enter')document.getElementById('ageInput').focus()">
+    <input type="number" id="ageInput" placeholder="Bạn mấy tuổi?" onkeydown="if(event.key==='Enter')submitProfile()">
+    <br>
+    <button class="big-btn" onclick="submitProfile()">Bắt đầu học!</button>
+  </div>
+
+  <!-- Chat -->
+  <div id="chatBox" class="hidden">
+    <div class="welcome" id="welcome">
+      <div class="icon">&#128075;</div>
+      <h2 id="welcomeName">Xin chào!</h2>
+      <p>Hãy nhắn gì đó để bắt đầu học tiếng Anh nhé!</p>
+    </div>
+  </div>
+
+  <div id="inputBar" class="hidden">
     <input type="text" id="msgInput" placeholder="Nhập tin nhắn..." autocomplete="off" onkeydown="if(event.key==='Enter')sendMsg()">
     <button id="sendBtn" onclick="sendMsg()">&#10148;</button>
   </div>
 </div>
 
 <script>
-// ===== CẤU HÌNH =====
-// Thay URL này bằng URL Cloudflare Worker của bạn
 const WORKER_URL = 'https://chat-proxy.dunglumy.workers.dev';
 
 // ===== STATE =====
 let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+let appKey = localStorage.getItem('appKey') || '';
+let profile = JSON.parse(localStorage.getItem('profile') || 'null');
 let sending = false;
-
-function saveChat() {
-  localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-}
 
 const $=id=>document.getElementById(id);
 
-// ===== GỬI TIN NHẮN =====
-async function sendMsg() {
-  const input = $('msgInput');
-  const text = input.value.trim();
-  if (!text || sending) return;
+function saveChat() { localStorage.setItem('chatHistory', JSON.stringify(chatHistory)); }
+function saveKey(k) { appKey=k; localStorage.setItem('appKey', k); }
+function saveProfile(p) { profile=p; localStorage.setItem('profile', JSON.stringify(p)); }
 
-  // Hide welcome
+// ===== INIT =====
+function init() {
+  if (!appKey) {
+    showScreen('keyScreen');
+  } else if (!profile) {
+    showScreen('profileScreen');
+  } else {
+    showChat();
+  }
+}
+
+function showScreen(id) {
+  $('keyScreen').classList.add('hidden');
+  $('profileScreen').classList.add('hidden');
+  $('chatBox').classList.add('hidden');
+  $('inputBar').classList.add('hidden');
+  $(id).classList.remove('hidden');
+}
+
+function showChat() {
+  $('keyScreen').classList.add('hidden');
+  $('profileScreen').classList.add('hidden');
+  $('chatBox').classList.remove('hidden');
+  $('inputBar').classList.remove('hidden');
+
+  // Restore chat
+  if (chatHistory.length > 0) {
+    const wel = $('welcome');
+    if (wel) wel.remove();
+    chatHistory.forEach(msg => {
+      addBubble(msg.role === 'user' ? 'user' : 'ai', msg.content);
+    });
+  } else if (profile) {
+    $('welcomeName').textContent = 'Xin chào ' + profile.name + '!';
+    // Auto-send greeting to start lesson
+    autoGreet();
+  }
+  $('msgInput').focus();
+}
+
+// ===== SUBMIT KEY =====
+async function submitKey() {
+  const key = $('keyInput').value.trim();
+  if (!key) return;
+  $('keyError').textContent = 'Đang kiểm tra...';
+
+  try {
+    const resp = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, messages: [{ role: 'user', content: 'test' }] })
+    });
+    const data = await resp.json();
+    if (resp.status === 401) {
+      $('keyError').textContent = 'Sai mật mã! Hỏi ba mẹ nhé.';
+      return;
+    }
+    // Key OK
+    saveKey(key);
+    $('keyError').textContent = '';
+    if (!profile) {
+      showScreen('profileScreen');
+      $('nameInput').focus();
+    } else {
+      showChat();
+    }
+  } catch (err) {
+    $('keyError').textContent = 'Lỗi kết nối! Thử lại sau.';
+  }
+}
+
+// ===== SUBMIT PROFILE =====
+function submitProfile() {
+  const name = $('nameInput').value.trim();
+  const age = parseInt($('ageInput').value);
+  if (!name) { $('nameInput').focus(); return; }
+  if (!age || age < 3 || age > 18) { $('ageInput').focus(); return; }
+
+  saveProfile({ name, age, level: null });
+  showChat();
+}
+
+// ===== AUTO GREET =====
+async function autoGreet() {
   const wel = $('welcome');
   if (wel) wel.remove();
 
-  // Add user message
-  chatHistory.push({ role: 'user', content: text });
-  saveChat();
-  addBubble('user', text);
-  input.value = '';
-  input.focus();
+  let greetMsg;
+  if (!profile.level) {
+    greetMsg = 'My name is ' + profile.name + ' and I am ' + profile.age + ' years old. This is my first time here. Please greet me warmly, then give me a placement test to determine my English level (ask 3-5 simple questions one by one).';
+  } else {
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    greetMsg = 'Hi Teacher! Today is ' + today + '. Please start today\'s lesson with a warm-up, then teach me new vocabulary and give me exercises.';
+  }
 
-  // Show typing
+  chatHistory.push({ role: 'user', content: greetMsg });
+  addBubble('user', profile.level ? 'Cô ơi, bắt đầu học nào! 🙋' : 'Chào cô! Em tên ' + profile.name + ', ' + profile.age + ' tuổi ạ! 🙋');
+
   sending = true;
   $('sendBtn').disabled = true;
   const typingEl = showTyping();
@@ -233,11 +373,49 @@ async function sendMsg() {
     const resp = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: chatHistory })
+      body: JSON.stringify({ key: appKey, messages: chatHistory, profile })
     });
-
     const data = await resp.json();
+    if (data.error) throw new Error(data.error);
 
+    chatHistory.push({ role: 'assistant', content: data.reply });
+    saveChat();
+    removeTyping(typingEl);
+    addBubble('ai', data.reply);
+  } catch (err) {
+    removeTyping(typingEl);
+    showError('Lỗi: ' + err.message);
+  }
+  sending = false;
+  $('sendBtn').disabled = false;
+}
+
+// ===== GỬI TIN NHẮN =====
+async function sendMsg() {
+  const input = $('msgInput');
+  const text = input.value.trim();
+  if (!text || sending) return;
+
+  const wel = $('welcome');
+  if (wel) wel.remove();
+
+  chatHistory.push({ role: 'user', content: text });
+  saveChat();
+  addBubble('user', text);
+  input.value = '';
+  input.focus();
+
+  sending = true;
+  $('sendBtn').disabled = true;
+  const typingEl = showTyping();
+
+  try {
+    const resp = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: appKey, messages: chatHistory, profile })
+    });
+    const data = await resp.json();
     if (data.error) throw new Error(data.error);
 
     const reply = data.reply;
@@ -246,11 +424,19 @@ async function sendMsg() {
     removeTyping(typingEl);
     addBubble('ai', reply);
 
+    // Detect level from AI response (placement test result)
+    if (!profile.level) {
+      const lvlMatch = reply.match(/level[:\s]*(beginner|elementary|pre-intermediate)/i);
+      if (lvlMatch) {
+        profile.level = lvlMatch[1].toLowerCase();
+        saveProfile(profile);
+      }
+    }
+
   } catch (err) {
     removeTyping(typingEl);
     showError('Lỗi: ' + err.message);
   }
-
   sending = false;
   $('sendBtn').disabled = false;
 }
@@ -263,7 +449,7 @@ function addBubble(type, text) {
 
   const label = document.createElement('div');
   label.className = 'label';
-  label.textContent = type === 'ai' ? '🤖 Cô giáo AI' : '👧 Bé';
+  label.textContent = type === 'ai' ? '👩‍🏫 Cô AI' : ('👧 ' + (profile ? profile.name : 'Bé'));
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
@@ -279,7 +465,7 @@ function showTyping() {
   const box = $('chatBox');
   const div = document.createElement('div');
   div.className = 'msg ai';
-  div.innerHTML = '<div class="label">🤖 Cô giáo AI</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+  div.innerHTML = '<div class="label">👩‍🏫 Cô AI</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
   return div;
@@ -300,26 +486,23 @@ function showError(msg) {
 function clearChat() {
   chatHistory = [];
   saveChat();
-  $('chatBox').innerHTML = `
-    <div class="welcome" id="welcome">
-      <div class="icon">&#128075;</div>
-      <h2>Xin chào bé!</h2>
-      <p>Hãy nhắn gì đó để bắt đầu học tiếng Anh nhé!<br>
-      Bé có thể viết tiếng Việt hoặc tiếng Anh đều được &#128522;</p>
-    </div>`;
+  $('chatBox').innerHTML = '';
+  if (profile) {
+    $('chatBox').innerHTML = '<div class="welcome" id="welcome"><div class="icon">&#128075;</div><h2>Xin chào ' + profile.name + '!</h2><p>Hãy nhắn gì đó để tiếp tục học nhé!</p></div>';
+  }
 }
 
-// Khôi phục chat cũ từ localStorage
-if (chatHistory.length > 0) {
-  const wel = $('welcome');
-  if (wel) wel.remove();
-  chatHistory.forEach(msg => {
-    addBubble(msg.role === 'user' ? 'user' : 'ai', msg.content);
-  });
+// ===== RESET ALL =====
+function resetAll() {
+  if (!confirm('Xóa hết dữ liệu và bắt đầu lại?')) return;
+  localStorage.removeItem('appKey');
+  localStorage.removeItem('profile');
+  localStorage.removeItem('chatHistory');
+  location.reload();
 }
 
-// Focus input on load
-$('msgInput').focus();
+// Start
+init();
 </script>
 </body>
 </html>
