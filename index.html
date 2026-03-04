@@ -232,7 +232,7 @@ body {
   <div class="screen hidden" id="profileScreen">
     <div class="icon">&#128075;</div>
     <h2>Chào bạn mới!</h2>
-    <p>Cô AI muốn biết về bạn nhé</p>
+    <p>Bạn AI muốn biết về bạn nhé</p>
     <input type="text" id="nameInput" placeholder="Tên của bạn..." onkeydown="if(event.key==='Enter')document.getElementById('ageInput').focus()">
     <input type="number" id="ageInput" placeholder="Bạn mấy tuổi?" onkeydown="if(event.key==='Enter')submitProfile()">
     <br>
@@ -358,14 +358,14 @@ async function autoGreet() {
 
   let greetMsg;
   if (!profile.level) {
-    greetMsg = 'My name is ' + profile.name + ' and I am ' + profile.age + ' years old. This is my first time here. Please greet me warmly, then give me a placement test to determine my English level (ask 3-5 simple questions one by one).';
+    greetMsg = 'My name is ' + profile.name + ' and I am ' + profile.age + ' years old. This is my first time here. Please greet me like a new friend, then play a fun quiz game with me to see my English level (ask 3-5 fun questions one by one).';
   } else {
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-    greetMsg = 'Hi Teacher! Today is ' + today + '. Please start today\'s lesson with a warm-up, then teach me new vocabulary and give me exercises.';
+    greetMsg = 'Hey friend! Today is ' + today + '. Let\'s hang out and learn some cool new English words today!';
   }
 
   chatHistory.push({ role: 'user', content: greetMsg });
-  addBubble('user', profile.level ? 'Cô ơi, bắt đầu học nào! 🙋' : 'Chào cô! Em tên ' + profile.name + ', ' + profile.age + ' tuổi ạ! 🙋');
+  addBubble('user', profile.level ? 'Hey! Học tiếp nào! 🙋' : 'Hello! Mình tên ' + profile.name + ', ' + profile.age + ' tuổi! 🙋');
 
   sending = true;
   $('sendBtn').disabled = true;
@@ -451,7 +451,7 @@ function addBubble(type, text) {
 
   const label = document.createElement('div');
   label.className = 'label';
-  label.textContent = type === 'ai' ? '👩‍🏫 Cô AI' : ('👧 ' + (profile ? profile.name : 'Bé'));
+  label.textContent = type === 'ai' ? '🤖 Bạn AI' : ('👧 ' + (profile ? profile.name : 'Bé'));
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
@@ -467,7 +467,7 @@ function showTyping() {
   const box = $('chatBox');
   const div = document.createElement('div');
   div.className = 'msg ai';
-  div.innerHTML = '<div class="label">👩‍🏫 Cô AI</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+  div.innerHTML = '<div class="label">🤖 Bạn AI</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
   return div;
