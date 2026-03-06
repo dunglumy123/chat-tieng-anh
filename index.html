@@ -618,8 +618,8 @@ function speakText(text, btn) {
   if (!clean) return;
   const utter = new SpeechSynthesisUtterance(clean);
   utter.lang = 'en-US';
-  utter.rate = 0.9;
-  utter.pitch = 1.6;
+  utter.rate = 1.15;
+  utter.pitch = 1.7;
   const voices = window.speechSynthesis.getVoices();
   const enVoice = voices.find(v => v.lang === 'en-US' && v.name.includes('Female'))
     || voices.find(v => v.lang === 'en-US')
