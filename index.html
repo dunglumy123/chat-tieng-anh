@@ -598,14 +598,19 @@ function resetAll() {
   location.reload();
 }
 
-// ===== KOKORO TTS (browser AI) =====
+// ===== KOKORO TTS (browser AI, desktop only) =====
+function isMobile() {
+  return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent) || window.innerWidth < 768;
+}
+
 async function initKokoro() {
   if (kokoroTTS || kokoroLoading) return;
+  if (isMobile()) { console.log('Mobile detected, skipping Kokoro TTS'); return; }
   kokoroLoading = true;
   try {
     const { KokoroTTS } = await import('https://cdn.jsdelivr.net/npm/kokoro-js@1/+esm');
-    kokoroTTS = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'q8', device: 'wasm' });
-    console.log('Kokoro TTS loaded! Voices:', kokoroTTS.list_voices());
+    kokoroTTS = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'q4', device: 'wasm' });
+    console.log('Kokoro TTS loaded!');
   } catch (e) {
     console.warn('Kokoro TTS failed, using Web Speech API fallback:', e.message);
   }
