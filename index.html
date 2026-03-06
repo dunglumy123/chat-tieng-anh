@@ -316,6 +316,9 @@ let isRecording = false;
 let recognition = null;
 let currentSpeakBtn = null;
 let sttTimeout = null;
+let kokoroTTS = null;
+let currentAudio = null;
+let kokoroLoading = false;
 
 const $=id=>document.getElementById(id);
 
@@ -335,6 +338,8 @@ function init() {
   }
   // Init STT
   initSTT();
+  // Load Kokoro TTS in background (non-blocking)
+  initKokoro();
 
   if (!appKey) {
     showScreen('keyScreen');
@@ -540,10 +545,7 @@ function addBubble(type, text, autoSpeak) {
     speakBtn.title = 'Nghe lại';
     speakBtn.onclick = () => {
       if (speakBtn.classList.contains('speaking')) {
-        window.speechSynthesis.cancel();
-        speakBtn.textContent = '🔊';
-        speakBtn.classList.remove('speaking');
-        currentSpeakBtn = null;
+        stopCurrentAudio();
       } else {
         speakText(text, speakBtn);
       }
@@ -596,6 +598,20 @@ function resetAll() {
   location.reload();
 }
 
+// ===== KOKORO TTS (browser AI) =====
+async function initKokoro() {
+  if (kokoroTTS || kokoroLoading) return;
+  kokoroLoading = true;
+  try {
+    const { KokoroTTS } = await import('https://cdn.jsdelivr.net/npm/kokoro-js@1/+esm');
+    kokoroTTS = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'q8', device: 'wasm' });
+    console.log('Kokoro TTS loaded! Voices:', kokoroTTS.list_voices());
+  } catch (e) {
+    console.warn('Kokoro TTS failed, using Web Speech API fallback:', e.message);
+  }
+  kokoroLoading = false;
+}
+
 // ===== TEXT-TO-SPEECH =====
 function cleanForTTS(text) {
   return text
@@ -606,29 +622,64 @@ function cleanForTTS(text) {
     .trim();
 }
 
-function speakText(text, btn) {
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  if (currentSpeakBtn && currentSpeakBtn !== btn) {
+function stopCurrentAudio() {
+  if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  if (currentSpeakBtn) {
     currentSpeakBtn.textContent = '🔊';
     currentSpeakBtn.classList.remove('speaking');
+    currentSpeakBtn = null;
   }
-  // If same button clicked while speaking → just cancel (already done above)
+}
+
+async function speakText(text, btn) {
+  stopCurrentAudio();
   if (!ttsEnabled && !btn) return;
   const clean = cleanForTTS(text);
   if (!clean) return;
+
+  if (btn) { btn.textContent = '⏳'; btn.classList.add('speaking'); currentSpeakBtn = btn; }
+
+  // Try Kokoro TTS first
+  if (kokoroTTS) {
+    try {
+      const audio = await kokoroTTS.generate(clean, { voice: 'am_puck' });
+      const wavData = audio.toWav();
+      const blob = new Blob([wavData], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      const audioEl = new Audio(url);
+      currentAudio = audioEl;
+      if (btn) btn.textContent = '⏸';
+      audioEl.onended = () => {
+        URL.revokeObjectURL(url);
+        if (btn) { btn.textContent = '🔊'; btn.classList.remove('speaking'); }
+        if (currentSpeakBtn === btn) currentSpeakBtn = null;
+        if (currentAudio === audioEl) currentAudio = null;
+      };
+      audioEl.onerror = () => {
+        URL.revokeObjectURL(url);
+        if (btn) { btn.textContent = '🔊'; btn.classList.remove('speaking'); }
+      };
+      audioEl.play();
+      return;
+    } catch (e) {
+      console.warn('Kokoro generate failed, fallback:', e.message);
+    }
+  }
+
+  // Fallback: Web Speech API
+  if (!window.speechSynthesis) { if (btn) { btn.textContent = '🔊'; btn.classList.remove('speaking'); } return; }
   const utter = new SpeechSynthesisUtterance(clean);
   utter.lang = 'en-US';
   utter.rate = 1.15;
   utter.pitch = 1.7;
   const voices = window.speechSynthesis.getVoices();
-  // Desktop voices support pitch/rate; Online (Natural) voices ignore them
   const enVoice = voices.find(v => v.lang === 'en-US' && v.name.includes('Desktop') && v.name.includes('Zira'))
     || voices.find(v => v.lang === 'en-US' && v.name.includes('Desktop'))
     || voices.find(v => v.lang === 'en-US')
     || voices.find(v => v.lang.startsWith('en'));
   if (enVoice) utter.voice = enVoice;
-  if (btn) { btn.textContent = '⏸'; btn.classList.add('speaking'); currentSpeakBtn = btn; }
+  if (btn) btn.textContent = '⏸';
   utter.onend = () => {
     if (btn) { btn.textContent = '🔊'; btn.classList.remove('speaking'); }
     if (currentSpeakBtn === btn) currentSpeakBtn = null;
@@ -645,7 +696,7 @@ function toggleTTS() {
   const btn = $('ttsToggle');
   btn.textContent = ttsEnabled ? '🔊' : '🔇';
   btn.classList.toggle('muted', !ttsEnabled);
-  if (!ttsEnabled) window.speechSynthesis.cancel();
+  if (!ttsEnabled) stopCurrentAudio();
 }
 
 // ===== SPEECH-TO-TEXT =====
@@ -695,7 +746,7 @@ function toggleMic() {
   if (isRecording) {
     recognition.stop();
   } else {
-    window.speechSynthesis.cancel();
+    stopCurrentAudio();
     clearTimeout(sttTimeout);
     $('msgInput').value = '';
     isRecording = true;
