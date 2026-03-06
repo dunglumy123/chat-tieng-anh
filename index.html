@@ -201,6 +201,50 @@ body {
 
 .hidden { display: none !important; }
 
+/* Mic button */
+#micBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: #e0e0e0;
+  color: #555;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+#micBtn:hover { background: #d0d0d0; }
+#micBtn.recording {
+  background: #e74c3c;
+  color: white;
+  animation: mic-pulse 1s infinite;
+}
+@keyframes mic-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(231,76,60,0.7); }
+  70%  { box-shadow: 0 0 0 10px rgba(231,76,60,0); }
+  100% { box-shadow: 0 0 0 0 rgba(231,76,60,0); }
+}
+
+/* Speaker replay button on AI bubble */
+.speak-btn {
+  background: none;
+  border: none;
+  font-size: 15px;
+  cursor: pointer;
+  opacity: 0.45;
+  padding: 2px 4px;
+  margin-top: 3px;
+  align-self: flex-start;
+  transition: opacity 0.15s;
+}
+.speak-btn:hover, .speak-btn.speaking { opacity: 1; }
+
+/* TTS toggle header button muted state */
+#ttsToggle.muted { opacity: 0.55; }
+
 @media (max-width: 480px) {
   #app { max-width: 100%; border-radius: 0; }
 }
@@ -212,6 +256,7 @@ body {
   <div id="header">
     <div class="title" id="headerTitle">&#127775; Trò chuyện với bạn của tôi</div>
     <div id="headerBtns">
+      <button class="hdr-btn" id="ttsToggle" onclick="toggleTTS()" title="Bật/tắt đọc to">🔊</button>
       <button class="hdr-btn" onclick="clearChat()">Xóa chat</button>
       <button class="hdr-btn" onclick="resetAll()">Đổi tài khoản</button>
     </div>
@@ -250,7 +295,8 @@ body {
   </div>
 
   <div id="inputBar" class="hidden">
-    <input type="text" id="msgInput" placeholder="Nhập tin nhắn..." autocomplete="off" onkeydown="if(event.key==='Enter')sendMsg()">
+    <button id="micBtn" onclick="toggleMic()" title="Nói tiếng Anh vào mic">🎤</button>
+    <input type="text" id="msgInput" placeholder="Nhập hoặc nói tiếng Anh..." autocomplete="off" onkeydown="if(event.key==='Enter')sendMsg()">
     <button id="sendBtn" onclick="sendMsg()">&#10148;</button>
   </div>
 </div>
@@ -264,6 +310,12 @@ let appKey = localStorage.getItem('appKey') || '';
 let profile = JSON.parse(localStorage.getItem('profile') || 'null');
 let sending = false;
 
+// Voice state
+let ttsEnabled = localStorage.getItem('ttsEnabled') !== 'false';
+let isRecording = false;
+let recognition = null;
+let currentSpeakBtn = null;
+
 const $=id=>document.getElementById(id);
 
 function saveChat() { localStorage.setItem('chatHistory', JSON.stringify(chatHistory)); }
@@ -272,6 +324,17 @@ function saveProfile(p) { profile=p; localStorage.setItem('profile', JSON.string
 
 // ===== INIT =====
 function init() {
+  // Init TTS toggle UI
+  const ttsBtn = $('ttsToggle');
+  ttsBtn.textContent = ttsEnabled ? '🔊' : '🔇';
+  ttsBtn.classList.toggle('muted', !ttsEnabled);
+  // Load voices async (needed for some browsers)
+  if (window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = () => {};
+  }
+  // Init STT
+  initSTT();
+
   if (!appKey) {
     showScreen('keyScreen');
   } else if (!profile) {
@@ -392,7 +455,7 @@ async function autoGreet() {
     chatHistory.push({ role: 'assistant', content: data.reply });
     saveChat();
     removeTyping(typingEl);
-    addBubble('ai', data.reply);
+    addBubble('ai', data.reply, true);
   } catch (err) {
     removeTyping(typingEl);
     showError('Lỗi: ' + err.message);
@@ -433,7 +496,7 @@ async function sendMsg() {
     chatHistory.push({ role: 'assistant', content: reply });
     saveChat();
     removeTyping(typingEl);
-    addBubble('ai', reply);
+    addBubble('ai', reply, true);
 
     // Detect level from AI response (placement test result)
     if (!profile.level) {
@@ -453,7 +516,7 @@ async function sendMsg() {
 }
 
 // ===== RENDER =====
-function addBubble(type, text) {
+function addBubble(type, text, autoSpeak) {
   const box = $('chatBox');
   const div = document.createElement('div');
   div.className = 'msg ' + type;
@@ -468,6 +531,26 @@ function addBubble(type, text) {
 
   div.appendChild(label);
   div.appendChild(bubble);
+
+  if (type === 'ai') {
+    const speakBtn = document.createElement('button');
+    speakBtn.className = 'speak-btn';
+    speakBtn.textContent = '🔊';
+    speakBtn.title = 'Nghe lại';
+    speakBtn.onclick = () => {
+      if (speakBtn.classList.contains('speaking')) {
+        window.speechSynthesis.cancel();
+        speakBtn.textContent = '🔊';
+        speakBtn.classList.remove('speaking');
+        currentSpeakBtn = null;
+      } else {
+        speakText(text, speakBtn);
+      }
+    };
+    div.appendChild(speakBtn);
+    if (autoSpeak && ttsEnabled) speakText(text, speakBtn);
+  }
+
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 }
@@ -510,6 +593,107 @@ function resetAll() {
   localStorage.removeItem('profile');
   localStorage.removeItem('chatHistory');
   location.reload();
+}
+
+// ===== TEXT-TO-SPEECH =====
+function cleanForTTS(text) {
+  return text
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+    .replace(/[\u{2600}-\u{27BF}]/gu, '')
+    .replace(/[*_~`#]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function speakText(text, btn) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  if (currentSpeakBtn && currentSpeakBtn !== btn) {
+    currentSpeakBtn.textContent = '🔊';
+    currentSpeakBtn.classList.remove('speaking');
+  }
+  // If same button clicked while speaking → just cancel (already done above)
+  if (!ttsEnabled && !btn) return;
+  const clean = cleanForTTS(text);
+  if (!clean) return;
+  const utter = new SpeechSynthesisUtterance(clean);
+  utter.lang = 'en-US';
+  utter.rate = 0.85;
+  utter.pitch = 1.0;
+  const voices = window.speechSynthesis.getVoices();
+  const enVoice = voices.find(v => v.lang === 'en-US' && v.name.includes('Female'))
+    || voices.find(v => v.lang === 'en-US')
+    || voices.find(v => v.lang.startsWith('en'));
+  if (enVoice) utter.voice = enVoice;
+  if (btn) { btn.textContent = '⏸'; btn.classList.add('speaking'); currentSpeakBtn = btn; }
+  utter.onend = () => {
+    if (btn) { btn.textContent = '🔊'; btn.classList.remove('speaking'); }
+    if (currentSpeakBtn === btn) currentSpeakBtn = null;
+  };
+  utter.onerror = () => {
+    if (btn) { btn.textContent = '🔊'; btn.classList.remove('speaking'); }
+  };
+  window.speechSynthesis.speak(utter);
+}
+
+function toggleTTS() {
+  ttsEnabled = !ttsEnabled;
+  localStorage.setItem('ttsEnabled', ttsEnabled);
+  const btn = $('ttsToggle');
+  btn.textContent = ttsEnabled ? '🔊' : '🔇';
+  btn.classList.toggle('muted', !ttsEnabled);
+  if (!ttsEnabled) window.speechSynthesis.cancel();
+}
+
+// ===== SPEECH-TO-TEXT =====
+function initSTT() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { $('micBtn').style.display = 'none'; return; }
+  recognition = new SR();
+  recognition.lang = 'en-US';
+  recognition.interimResults = true;
+  recognition.continuous = false;
+
+  recognition.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    const inp = $('msgInput');
+    inp.value = final || interim;
+    inp.style.color = final ? '' : '#aaa';
+  };
+
+  recognition.onend = () => {
+    isRecording = false;
+    $('micBtn').classList.remove('recording');
+    $('micBtn').textContent = '🎤';
+    const inp = $('msgInput');
+    inp.style.color = '';
+    if (inp.value.trim() && !sending) sendMsg();
+  };
+
+  recognition.onerror = () => {
+    isRecording = false;
+    $('micBtn').classList.remove('recording');
+    $('micBtn').textContent = '🎤';
+    $('msgInput').style.color = '';
+  };
+}
+
+function toggleMic() {
+  if (!recognition) return;
+  if (isRecording) {
+    recognition.stop();
+  } else {
+    window.speechSynthesis.cancel();
+    $('msgInput').value = '';
+    isRecording = true;
+    $('micBtn').classList.add('recording');
+    $('micBtn').textContent = '🛑';
+    recognition.start();
+  }
 }
 
 // Start
