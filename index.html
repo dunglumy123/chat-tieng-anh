@@ -315,6 +315,7 @@ let ttsEnabled = localStorage.getItem('ttsEnabled') !== 'false';
 let isRecording = false;
 let recognition = null;
 let currentSpeakBtn = null;
+let sttTimeout = null;
 
 const $=id=>document.getElementById(id);
 
@@ -654,20 +655,25 @@ function initSTT() {
   recognition = new SR();
   recognition.lang = 'en-US';
   recognition.interimResults = true;
-  recognition.continuous = false;
+  recognition.continuous = true;
 
   recognition.onresult = (e) => {
-    let interim = '', final = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) final += e.results[i][0].transcript;
-      else interim += e.results[i][0].transcript;
+    let transcript = '';
+    for (let i = 0; i < e.results.length; i++) {
+      transcript += e.results[i][0].transcript;
     }
     const inp = $('msgInput');
-    inp.value = final || interim;
-    inp.style.color = final ? '' : '#aaa';
+    inp.value = transcript;
+    inp.style.color = e.results[e.results.length - 1].isFinal ? '' : '#aaa';
+    // Chờ 3 giây im lặng rồi mới tự dừng và gửi
+    clearTimeout(sttTimeout);
+    sttTimeout = setTimeout(() => {
+      if (isRecording) recognition.stop();
+    }, 3000);
   };
 
   recognition.onend = () => {
+    clearTimeout(sttTimeout);
     isRecording = false;
     $('micBtn').classList.remove('recording');
     $('micBtn').textContent = '🎤';
@@ -690,6 +696,7 @@ function toggleMic() {
     recognition.stop();
   } else {
     window.speechSynthesis.cancel();
+    clearTimeout(sttTimeout);
     $('msgInput').value = '';
     isRecording = true;
     $('micBtn').classList.add('recording');
