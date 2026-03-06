@@ -621,7 +621,9 @@ function speakText(text, btn) {
   utter.rate = 1.15;
   utter.pitch = 1.7;
   const voices = window.speechSynthesis.getVoices();
-  const enVoice = voices.find(v => v.lang === 'en-US' && v.name.includes('Female'))
+  // Desktop voices support pitch/rate; Online (Natural) voices ignore them
+  const enVoice = voices.find(v => v.lang === 'en-US' && v.name.includes('Desktop') && v.name.includes('Zira'))
+    || voices.find(v => v.lang === 'en-US' && v.name.includes('Desktop'))
     || voices.find(v => v.lang === 'en-US')
     || voices.find(v => v.lang.startsWith('en'));
   if (enVoice) utter.voice = enVoice;
