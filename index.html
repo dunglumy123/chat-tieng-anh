@@ -316,9 +316,7 @@ let isRecording = false;
 let recognition = null;
 let currentSpeakBtn = null;
 let sttTimeout = null;
-let kokoroTTS = null;
 let currentAudio = null;
-let kokoroLoading = false;
 
 const $=id=>document.getElementById(id);
 
@@ -338,8 +336,6 @@ function init() {
   }
   // Init STT
   initSTT();
-  // Load Kokoro TTS in background (non-blocking)
-  initKokoro();
 
   if (!appKey) {
     showScreen('keyScreen');
@@ -598,25 +594,6 @@ function resetAll() {
   location.reload();
 }
 
-// ===== KOKORO TTS (browser AI, desktop only) =====
-function isMobile() {
-  return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent) || window.innerWidth < 768;
-}
-
-async function initKokoro() {
-  if (kokoroTTS || kokoroLoading) return;
-  if (isMobile()) { console.log('Mobile detected, skipping Kokoro TTS'); return; }
-  kokoroLoading = true;
-  try {
-    const { KokoroTTS } = await import('https://cdn.jsdelivr.net/npm/kokoro-js@1/+esm');
-    kokoroTTS = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'q4', device: 'wasm' });
-    console.log('Kokoro TTS loaded!');
-  } catch (e) {
-    console.warn('Kokoro TTS failed, using Web Speech API fallback:', e.message);
-  }
-  kokoroLoading = false;
-}
-
 // ===== TEXT-TO-SPEECH =====
 function cleanForTTS(text) {
   return text
@@ -628,7 +605,6 @@ function cleanForTTS(text) {
 }
 
 function stopCurrentAudio() {
-  if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   if (currentSpeakBtn) {
     currentSpeakBtn.textContent = '🔊';
@@ -637,47 +613,19 @@ function stopCurrentAudio() {
   }
 }
 
-async function speakText(text, btn) {
+function speakText(text, btn) {
   stopCurrentAudio();
   if (!ttsEnabled && !btn) return;
   const clean = cleanForTTS(text);
   if (!clean) return;
-
-  if (btn) { btn.textContent = '⏳'; btn.classList.add('speaking'); currentSpeakBtn = btn; }
-
-  // Try Kokoro TTS first
-  if (kokoroTTS) {
-    try {
-      const audio = await kokoroTTS.generate(clean, { voice: 'am_puck' });
-      const wavData = audio.toWav();
-      const blob = new Blob([wavData], { type: 'audio/wav' });
-      const url = URL.createObjectURL(blob);
-      const audioEl = new Audio(url);
-      currentAudio = audioEl;
-      if (btn) btn.textContent = '⏸';
-      audioEl.onended = () => {
-        URL.revokeObjectURL(url);
-        if (btn) { btn.textContent = '🔊'; btn.classList.remove('speaking'); }
-        if (currentSpeakBtn === btn) currentSpeakBtn = null;
-        if (currentAudio === audioEl) currentAudio = null;
-      };
-      audioEl.onerror = () => {
-        URL.revokeObjectURL(url);
-        if (btn) { btn.textContent = '🔊'; btn.classList.remove('speaking'); }
-      };
-      audioEl.play();
-      return;
-    } catch (e) {
-      console.warn('Kokoro generate failed, fallback:', e.message);
-    }
-  }
-
-  // Fallback: Web Speech API
   if (!window.speechSynthesis) { if (btn) { btn.textContent = '🔊'; btn.classList.remove('speaking'); } return; }
+
+  if (btn) { btn.classList.add('speaking'); currentSpeakBtn = btn; }
+
   const utter = new SpeechSynthesisUtterance(clean);
   utter.lang = 'en-US';
-  utter.rate = 1.15;
-  utter.pitch = 1.7;
+  utter.rate = 0.9;
+  utter.pitch = 1.1;
   const voices = window.speechSynthesis.getVoices();
   const enVoice = voices.find(v => v.lang === 'en-US' && v.name.includes('Desktop') && v.name.includes('Zira'))
     || voices.find(v => v.lang === 'en-US' && v.name.includes('Desktop'))
